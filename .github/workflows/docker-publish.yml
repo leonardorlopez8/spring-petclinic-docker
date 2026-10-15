@@ -30,3 +30,25 @@ jobs:
         run: |
           docker push leonardorlopez/petclinic:${{ github.sha }}
           docker push leonardorlopez/petclinic:latest
+
+      - name: Smoke test published image
+        run: |
+          docker pull leonardorlopez/petclinic:latest
+          docker run -d --rm --name petclinic-smoke -p 8080:8080 leonardorlopez/petclinic:latest
+          trap 'docker stop petclinic-smoke >/dev/null 2>&1 || true' EXIT
+          for i in {1..30}; do
+            if curl --fail --silent http://localhost:8080/ > /dev/null; then
+              echo "Petclinic respondió correctamente"
+              break
+            fi
+
+            if [ "$i" -eq 30 ]; then
+              docker logs petclinic-smoke
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          sleep 60
+          docker stop petclinic-smoke
